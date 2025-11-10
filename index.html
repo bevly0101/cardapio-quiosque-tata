@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Visualizar PDF - Páginas em sequência</title>
+  <style>
+    :root {
+      --page-width: 794px;  /* ~ A4 96dpi */
+      --page-height: 1123px;
+      --page-bg: transparent;
+      --page-border: transparent;
+      --page-shadow: 0 4px 18px rgba(0, 0, 0, 0.16);
+      --page-gap: 24px;
+      --body-bg: #1f1f1f;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background-color: var(--body-bg);
+      padding: 24px 0 40px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .viewer-wrapper {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    .viewer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--page-gap);
+    }
+
+    .pdf-page {
+      width: var(--page-width);
+      height: var(--page-height);
+      background-color: var(--page-bg);
+      border: 1px solid var(--page-border);
+      box-shadow: var(--page-shadow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .pdf-page canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .loading,
+    .error {
+      font-size: 14px;
+      color: #555;
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .error {
+      color: #c0392b;
+    }
+  </style>
+  <!-- PDF.js via CDN (sem SRI para evitar erro de integridade) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+  <div class="viewer-wrapper">
+    <div class="viewer">
+      <div id="status" class="loading">Carregando PDF...</div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const pdfUrl = '5QMlaW_add1ec9a7f38f989.pdf'; // mesmo diretório do HTML
+      const viewer = document.querySelector('.viewer');
+      const statusEl = document.getElementById('status');
+
+      const pdfjsLib = window['pdfjsLib'];
+      if (!pdfjsLib) {
+        statusEl.className = 'error';
+        statusEl.textContent = 'Erro: PDF.js não pôde ser carregado.';
+        return;
+      }
+
+      // Necessário para algumas versões do PDF.js (define caminho do worker)
+      if (pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+
+      function renderPDF(url) {
+        pdfjsLib.getDocument(url).promise.then(function (pdf) {
+          statusEl.remove();
+
+          const totalPages = pdf.numPages;
+
+          // Renderiza cada página, uma abaixo da outra
+          for (let pageNumber = 1; pageNumber <= totalPages; pageNumber++) {
+            pdf.getPage(pageNumber).then(function (page) {
+              const viewport = page.getViewport({ scale: 1.5 });
+
+              const pageContainer = document.createElement('div');
+              pageContainer.className = 'pdf-page';
+
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+
+              canvas.width = viewport.width;
+              canvas.height = viewport.height;
+
+              // Ajusta a proporção visual do container para bater com a página
+              pageContainer.style.width = viewport.width + 'px';
+              pageContainer.style.height = viewport.height + 'px';
+
+              pageContainer.appendChild(canvas);
+              viewer.appendChild(pageContainer);
+
+              const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+              };
+
+              page.render(renderContext);
+            }).catch(function (error) {
+              const errorEl = document.createElement('div');
+              errorEl.className = 'error';
+              errorEl.textContent = 'Erro ao renderizar página ' + pageNumber + ': ' + error.message;
+              viewer.appendChild(errorEl);
+            });
+          }
+        }).catch(function (error) {
+          statusEl.className = 'error';
+          statusEl.textContent = 'Erro ao carregar PDF: ' + error.message;
+        });
+      }
+
+      renderPDF(pdfUrl);
+    })();
+  </script>
+</body>
+</html>
